@@ -62,6 +62,9 @@ struct erofs_sb_info {
 	/* the dedicated workstation for compression */
 	struct radix_tree_root workstn_tree;
 
+	/* strategy of sync decompression (false - auto, true - force on) */
+	bool readahead_sync_decompress;
+
 	/* threshold for decompression synchronously */
 	unsigned int max_sync_decompress_pages;
 
@@ -243,7 +246,7 @@ struct erofs_inode {
 
 	unsigned char datalayout;
 	unsigned char inode_isize;
-	unsigned short xattr_isize;
+	unsigned int xattr_isize;
 
 	unsigned int xattr_shared_count;
 	unsigned int *xattr_shared_xattrs;
@@ -393,21 +396,6 @@ int erofs_namei(struct inode *dir, struct qstr *name,
 /* dir.c */
 extern const struct file_operations erofs_dir_fops;
 
-static inline void *erofs_vm_map_ram(struct page **pages, unsigned int count)
-{
-	int retried = 0;
-
-	while (1) {
-		void *p = vm_map_ram(pages, count, -1, PAGE_KERNEL);
-
-		/* retry two more times (totally 3 times) */
-		if (p || ++retried >= 3)
-			return p;
-		vm_unmap_aliases();
-	}
-	return NULL;
-}
-
 /* pcpubuf.c */
 void *erofs_get_pcpubuf(unsigned int requiredpages);
 void erofs_put_pcpubuf(void *ptr);
@@ -433,7 +421,8 @@ int __init z_erofs_init_zip_subsystem(void);
 void z_erofs_exit_zip_subsystem(void);
 int erofs_try_to_free_all_cached_pages(struct erofs_sb_info *sbi,
 				       struct erofs_workgroup *egrp);
-int erofs_try_to_free_cached_page(struct page *page);
+int erofs_try_to_free_cached_page(struct address_space *mapping,
+				  struct page *page);
 int z_erofs_load_lz4_config(struct super_block *sb,
 			    struct erofs_super_block *dsb,
 			    struct z_erofs_lz4_cfgs *lz4, int len);
